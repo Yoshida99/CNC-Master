@@ -19,7 +19,7 @@ import com.yoshida.cncmaster.v02.FeedScreenV02
 import com.yoshida.cncmaster.v02.MaterialsScreen
 import com.yoshida.cncmaster.v02.PartsScreen
 import com.yoshida.cncmaster.v02.RpmScreenV02
-import com.yoshida.cncmaster.v02.ThreadsScreen
+import com.yoshida.cncmaster.v02.ThreadsScreenV02Extended
 import com.yoshida.cncmaster.v02.ToolingScreen
 import com.yoshida.cncmaster.v02.V02HomeScreen
 import com.yoshida.cncmaster.v02.V02Screen
@@ -67,7 +67,7 @@ private fun CncMasterV02(openUpdatesRequested: Boolean) {
         V02Screen.RPM -> RpmScreenV02(backToHome)
         V02Screen.FEED -> FeedScreenV02(backToHome)
         V02Screen.VC -> CuttingSpeedScreenV02(backToHome)
-        V02Screen.THREADS -> ThreadsScreen(backToHome)
+        V02Screen.THREADS -> ThreadsScreenV02Extended(backToHome)
         V02Screen.MATERIALS -> MaterialsScreen(backToHome)
         V02Screen.FANUC -> FanucScreen(backToHome)
         V02Screen.DIAGNOSTICS -> DiagnosticsScreen(backToHome)
