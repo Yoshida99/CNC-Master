@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.yoshida.cncmaster.ai.AiProgrammerScreen
 import com.yoshida.cncmaster.ui.theme.CNCMasterTheme
 import com.yoshida.cncmaster.v02.AdvisorScreen
 import com.yoshida.cncmaster.v02.CuttingSpeedScreenV02
@@ -63,6 +64,7 @@ private fun CncMasterV02(openUpdatesRequested: Boolean) {
             openUpdatesRequested = openUpdatesRequested,
             onNavigate = { screen = it },
         )
+        V02Screen.AI_PROGRAMMER -> AiProgrammerScreen(backToHome)
         V02Screen.ADVISOR -> AdvisorScreen(backToHome)
         V02Screen.RPM -> RpmScreenV02(backToHome)
         V02Screen.FEED -> FeedScreenV02(backToHome)
