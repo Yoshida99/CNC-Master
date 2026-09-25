@@ -1,12 +1,21 @@
 {
   "available": true,
-  "latest_version_code": 0,
-  "latest_version_name": "0.1.0",
+  "latest_version_code": 24,
+  "latest_version_name": "0.2.0",
   "min_supported_version_code": 1,
   "mandatory": false,
-  "download_url": "",
-  "sha256": "",
-  "size_bytes": 0,
-  "changelog": [],
-  "published_at": ""
+  "download_url": "https://github.com/Yoshida99/CNC-Master/releases/download/v0.2.0/CNC-Master.apk",
+  "sha256": "7c95c8c238139d91845570d104eba52f6722d2a87786cf07d7122b18e5bf9d50",
+  "size_bytes": 13478940,
+  "changelog": [
+    "Новый модуль «Умные режимы»: стартовые Vc, RPM, f, F и ap по материалу и операции.",
+    "Полностью переработан модуль резьб: Metric, ISO 965 fine/coarse, UNC, UNF, BSPP, BSPT и NPT.",
+    "Добавлен Fanuc 0i-TF помощник с проверочными шаблонами G76 и G92, G97 RPM и копированием кода.",
+    "Диагностика теперь даёт причины, порядок проверок и корректирующие действия.",
+    "Раздел «Инструмент» получил справочник и офлайн-журнал стойкости пластин.",
+    "Добавлен раздел «Мои детали» с локальным сохранением наладок, программ и времени цикла.",
+    "Системная кнопка/жест «Назад» корректно возвращает на главный экран.",
+    "CI запускает unit-тесты, Android lint и debug-сборку; публикация подписанного релиза выполняется отдельно вручную."
+  ],
+  "published_at": "2026-09-25T19:52:50Z"
 }
