@@ -40,6 +40,25 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
+      - name: Detect permanent signing configuration
+        if: github.event_name != 'pull_request'
+        id: signing
+        shell: bash
+        run: |
+          if [ -n "$CNC_KEYSTORE_BASE64" ] && [ -n "$CNC_STORE_PASSWORD" ] && [ -n "$CNC_KEY_ALIAS" ] && [ -n "$CNC_KEY_PASSWORD" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Permanent signing secrets are not configured. This run can validate the app, but its temporary debug APK must not be used as an update base."
+          fi
+
+      - name: Restore permanent signing key
+        if: github.event_name != 'pull_request' && steps.signing.outputs.ready == 'true'
+        shell: bash
+        run: |
+          echo "$CNC_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cnc-master-release.jks"
+          echo "CNC_SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/cnc-master-release.jks" >> "$GITHUB_ENV"
+
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
 
@@ -50,28 +69,19 @@ jobs:
         if: github.event_name != 'pull_request'
         run: gradle :app:assembleDebug --stacktrace
 
-      - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
+      - name: Upload permanently signed test APK
+        uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request' && steps.signing.outputs.ready == 'true'
         with:
-          name: CNC-Master-debug-apk
+          name: CNC-Master-permanent-test-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Check signing configuration
-        if: github.event_name == 'workflow_dispatch'
-        id: signing
-        shell: bash
-        run: |
-          if [ -n "$CNC_KEYSTORE_BASE64" ] && [ -n "$CNC_STORE_PASSWORD" ] && [ -n "$CNC_KEY_ALIAS" ] && [ -n "$CNC_KEY_PASSWORD" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Signing secrets are not configured. Signed release publishing is skipped."
-          fi
-
-      - name: Restore permanent signing key
-        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
-        shell: bash
-        run: echo "$CNC_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cnc-master-release.jks"
+      - name: Upload temporary validation APK
+        uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request' && steps.signing.outputs.ready != 'true'
+        with:
+          name: CNC-Master-temporary-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Build unsigned release APK
         if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
@@ -82,7 +92,7 @@ jobs:
             -PCNC_VERSION_CODE="$GITHUB_RUN_NUMBER" \
             -PCNC_VERSION_NAME="$RELEASE_VERSION"
 
-      - name: Sign release APK
+      - name: Sign release APK with the same permanent key
         if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
         shell: bash
         run: |
