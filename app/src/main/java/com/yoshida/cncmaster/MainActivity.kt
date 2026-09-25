@@ -3,6 +3,7 @@ package com.yoshida.cncmaster
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,6 +83,10 @@ private data class HomeTool(
 @Composable
 private fun CncMasterApp(openUpdatesRequested: Boolean) {
     var screen by remember { mutableStateOf(Screen.HOME) }
+
+    BackHandler(enabled = screen != Screen.HOME) {
+        screen = Screen.HOME
+    }
 
     when (screen) {
         Screen.HOME -> HomeScreen(openUpdatesRequested = openUpdatesRequested, onOpen = { screen = it })
