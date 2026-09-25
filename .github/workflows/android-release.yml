@@ -1,4 +1,4 @@
-name: Android build and in-app update release
+name: Android validation and release
 
 permissions:
   contents: write
@@ -9,6 +9,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version, for example 0.2.0"
+        required: true
+        default: "0.2.0"
 
 jobs:
   build:
@@ -35,12 +40,21 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Compile debug on pull request
-        if: github.event_name == 'pull_request'
-        run: gradle :app:compileDebugKotlin --stacktrace
+      - name: Run unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace
+
+      - name: Build debug APK
+        if: github.event_name != 'pull_request'
+        run: gradle :app:assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: CNC-Master-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Check signing configuration
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch'
         id: signing
         shell: bash
         run: |
@@ -48,33 +62,25 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Signing secrets are not configured. A debug APK will be built, but in-app release publishing is skipped."
+            echo "Signing secrets are not configured. Signed release publishing is skipped."
           fi
 
-      - name: Build debug APK when signing is not configured
-        if: github.event_name != 'pull_request' && steps.signing.outputs.ready != 'true'
-        run: gradle :app:assembleDebug --stacktrace
-
-      - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request' && steps.signing.outputs.ready != 'true'
-        with:
-          name: CNC-Master-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-
       - name: Restore permanent signing key
-        if: github.event_name != 'pull_request' && steps.signing.outputs.ready == 'true'
+        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
         shell: bash
         run: echo "$CNC_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cnc-master-release.jks"
 
       - name: Build unsigned release APK
-        if: github.event_name != 'pull_request' && steps.signing.outputs.ready == 'true'
+        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
         run: |
           gradle :app:assembleRelease --stacktrace \
             -PCNC_VERSION_CODE="$GITHUB_RUN_NUMBER" \
-            -PCNC_VERSION_NAME="0.1.$GITHUB_RUN_NUMBER"
+            -PCNC_VERSION_NAME="$RELEASE_VERSION"
 
       - name: Sign release APK
-        if: github.event_name != 'pull_request' && steps.signing.outputs.ready == 'true'
+        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -92,25 +98,31 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/CNC-Master.apk
 
       - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request' && steps.signing.outputs.ready == 'true'
+        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
         with:
           name: CNC-Master-signed-apk
           path: app/build/outputs/apk/release/CNC-Master.apk
 
       - name: Publish GitHub release and version manifest
-        if: github.event_name == 'push' && steps.signing.outputs.ready == 'true'
+        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
         shell: bash
         run: |
           set -euo pipefail
           VERSION_CODE="$GITHUB_RUN_NUMBER"
-          VERSION_NAME="0.1.$GITHUB_RUN_NUMBER"
+          VERSION_NAME="$RELEASE_VERSION"
           TAG="v$VERSION_NAME"
           APK="app/build/outputs/apk/release/CNC-Master.apk"
           APK_SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           APK_SIZE="$(stat -c%s "$APK")"
           PUBLISHED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Choose another version."
+            exit 1
+          fi
 
           gh release create "$TAG" "$APK#CNC-Master.apk" \
             --title "CNC Master $VERSION_NAME" \
@@ -140,7 +152,7 @@ jobs:
               "download_url": f"https://github.com/Yoshida99/CNC-Master/releases/download/{os.environ['TAG']}/CNC-Master.apk",
               "sha256": os.environ["APK_SHA256"],
               "size_bytes": int(os.environ["APK_SIZE"]),
-              "changelog": changelog[:6],
+              "changelog": changelog[:8],
               "published_at": os.environ["PUBLISHED_AT"],
           }
           Path("update/version.json").write_text(
