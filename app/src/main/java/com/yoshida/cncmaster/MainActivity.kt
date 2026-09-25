@@ -14,7 +14,7 @@ import com.yoshida.cncmaster.ui.theme.CNCMasterTheme
 import com.yoshida.cncmaster.v02.AdvisorScreen
 import com.yoshida.cncmaster.v02.CuttingSpeedScreenV02
 import com.yoshida.cncmaster.v02.DiagnosticsScreen
-import com.yoshida.cncmaster.v02.FanucScreen
+import com.yoshida.cncmaster.v02.FanucScreenV02Polished
 import com.yoshida.cncmaster.v02.FeedScreenV02
 import com.yoshida.cncmaster.v02.MaterialsScreen
 import com.yoshida.cncmaster.v02.PartsScreen
@@ -69,7 +69,7 @@ private fun CncMasterV02(openUpdatesRequested: Boolean) {
         V02Screen.VC -> CuttingSpeedScreenV02(backToHome)
         V02Screen.THREADS -> ThreadsScreenV02Extended(backToHome)
         V02Screen.MATERIALS -> MaterialsScreen(backToHome)
-        V02Screen.FANUC -> FanucScreen(backToHome)
+        V02Screen.FANUC -> FanucScreenV02Polished(backToHome)
         V02Screen.DIAGNOSTICS -> DiagnosticsScreen(backToHome)
         V02Screen.TOOLING -> ToolingScreen(backToHome)
         V02Screen.PARTS -> PartsScreen(backToHome)
