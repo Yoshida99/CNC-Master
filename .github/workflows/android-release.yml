@@ -49,7 +49,26 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Permanent signing secrets are not configured. This run can validate the app, but its temporary debug APK must not be used as an update base."
+            echo "Permanent signing secrets are not configured."
+          fi
+
+      - name: Decide whether this run publishes a release
+        if: github.event_name != 'pull_request'
+        id: release_gate
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          INPUT_VERSION: ${{ inputs.release_version }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "version=${INPUT_VERSION:-0.2.0}" >> "$GITHUB_OUTPUT"
+          elif [[ "$COMMIT_MESSAGE" == *"[release 0.2.0]"* ]]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "version=0.2.0" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Restore permanent signing key
@@ -84,22 +103,20 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Build unsigned release APK
-        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
+        if: steps.release_gate.outputs.release == 'true' && steps.signing.outputs.ready == 'true'
         env:
-          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_VERSION: ${{ steps.release_gate.outputs.version }}
         run: |
           gradle :app:assembleRelease --stacktrace \
             -PCNC_VERSION_CODE="$GITHUB_RUN_NUMBER" \
             -PCNC_VERSION_NAME="$RELEASE_VERSION"
 
-      - name: Sign release APK with the same permanent key
-        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
+      - name: Sign release APK with permanent key
+        if: steps.release_gate.outputs.release == 'true' && steps.signing.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
-          test -n "$APKSIGNER"
-
           "$APKSIGNER" sign \
             --ks "$RUNNER_TEMP/cnc-master-release.jks" \
             --ks-key-alias "$CNC_KEY_ALIAS" \
@@ -107,20 +124,19 @@ jobs:
             --key-pass env:CNC_KEY_PASSWORD \
             --out app/build/outputs/apk/release/CNC-Master.apk \
             app/build/outputs/apk/release/app-release-unsigned.apk
-
           "$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/CNC-Master.apk
 
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
+        if: steps.release_gate.outputs.release == 'true' && steps.signing.outputs.ready == 'true'
         with:
           name: CNC-Master-signed-apk
           path: app/build/outputs/apk/release/CNC-Master.apk
 
       - name: Publish GitHub release and version manifest
-        if: github.event_name == 'workflow_dispatch' && steps.signing.outputs.ready == 'true'
+        if: steps.release_gate.outputs.release == 'true' && steps.signing.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_VERSION: ${{ steps.release_gate.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -133,7 +149,7 @@ jobs:
           PUBLISHED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists. Choose another version."
+            echo "Release $TAG already exists."
             exit 1
           fi
 
