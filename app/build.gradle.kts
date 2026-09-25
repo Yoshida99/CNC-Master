@@ -21,6 +21,15 @@ val updateManifestUrl = providers.gradleProperty("CNC_UPDATE_MANIFEST_URL")
     .orElse("https://raw.githubusercontent.com/Yoshida99/CNC-Master/main/update/version.json")
     .get()
 
+val permanentKeystorePath = providers.environmentVariable("CNC_SIGNING_KEYSTORE_PATH").orNull
+val permanentStorePassword = providers.environmentVariable("CNC_STORE_PASSWORD").orNull
+val permanentKeyAlias = providers.environmentVariable("CNC_KEY_ALIAS").orNull
+val permanentKeyPassword = providers.environmentVariable("CNC_KEY_PASSWORD").orNull
+val hasPermanentSigning = !permanentKeystorePath.isNullOrBlank() &&
+    !permanentStorePassword.isNullOrBlank() &&
+    !permanentKeyAlias.isNullOrBlank() &&
+    !permanentKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.yoshida.cncmaster"
     compileSdk = 37
@@ -34,6 +43,25 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
+    }
+
+    signingConfigs {
+        if (hasPermanentSigning) {
+            create("permanent") {
+                storeFile = file(permanentKeystorePath!!)
+                storePassword = permanentStorePassword
+                keyAlias = permanentKeyAlias
+                keyPassword = permanentKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            if (hasPermanentSigning) {
+                signingConfig = signingConfigs.getByName("permanent")
+            }
+        }
     }
 
     buildFeatures {
