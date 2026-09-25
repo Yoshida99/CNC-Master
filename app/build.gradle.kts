@@ -21,6 +21,11 @@ val updateManifestUrl = providers.gradleProperty("CNC_UPDATE_MANIFEST_URL")
     .orElse("https://raw.githubusercontent.com/Yoshida99/CNC-Master/main/update/version.json")
     .get()
 
+val aiBackendUrl = providers.gradleProperty("CNC_AI_BACKEND_URL")
+    .orElse(providers.environmentVariable("CNC_AI_BACKEND_URL"))
+    .orElse("")
+    .get()
+
 val permanentKeystorePath = providers.environmentVariable("CNC_SIGNING_KEYSTORE_PATH").orNull
 val permanentStorePassword = providers.environmentVariable("CNC_STORE_PASSWORD").orNull
 val permanentKeyAlias = providers.environmentVariable("CNC_KEY_ALIAS").orNull
@@ -43,6 +48,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
+        buildConfigField("String", "AI_BACKEND_URL", "\"$aiBackendUrl\"")
     }
 
     signingConfigs {
