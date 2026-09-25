@@ -5,16 +5,16 @@ plugins {
 
 val cncVersionCode = providers.gradleProperty("CNC_VERSION_CODE")
     .orElse(providers.environmentVariable("GITHUB_RUN_NUMBER"))
-    .orElse("1")
+    .orElse("2")
     .get()
     .toInt()
 
 val cncVersionName = providers.gradleProperty("CNC_VERSION_NAME")
     .orElse(
         providers.environmentVariable("GITHUB_RUN_NUMBER")
-            .map { "0.1." + it }
+            .map { "0.2." + it }
     )
-    .orElse("0.1.0")
+    .orElse("0.2.0")
     .get()
 
 val updateManifestUrl = providers.gradleProperty("CNC_UPDATE_MANIFEST_URL")
