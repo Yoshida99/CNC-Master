@@ -98,6 +98,8 @@ jobs:
         with:
           name: CNC-Master-permanent-test-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          # Debug builds are reproducible from reviewed source; keep a brief copy.
+          retention-days: 3
 
       - name: Upload temporary validation APK
         uses: actions/upload-artifact@v4
@@ -105,6 +107,7 @@ jobs:
         with:
           name: CNC-Master-temporary-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 3
 
       - name: Build unsigned release APK
         if: steps.release_gate.outputs.release == 'true' && steps.signing.outputs.ready == 'true'
@@ -135,6 +138,8 @@ jobs:
         with:
           name: CNC-Master-signed-apk
           path: app/build/outputs/apk/release/CNC-Master.apk
+          # Published signed releases remain on GitHub Releases separately.
+          retention-days: 14
 
       - name: Publish GitHub release and version manifest
         if: steps.release_gate.outputs.release == 'true' && steps.signing.outputs.ready == 'true'
