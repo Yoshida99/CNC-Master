@@ -44,6 +44,7 @@ RATE_LIMIT = int(os.getenv("CNC_RATE_LIMIT", "10"))
 RATE_WINDOW_SECONDS = int(os.getenv("CNC_RATE_WINDOW_SECONDS", "60"))
 SESSION_TTL_SECONDS = int(os.getenv("CNC_SESSION_TTL_SECONDS", "21600"))
 ALLOW_LEGACY_TOKEN = os.getenv("CNC_ALLOW_LEGACY_TOKEN", "false").strip().lower() in {"1", "true", "yes"}
+ALLOW_ANONYMOUS_CLIENTS = os.getenv("CNC_ALLOW_ANONYMOUS_CLIENTS", "false").strip().lower() in {"1", "true", "yes"}
 
 try:
     client_tokens = parse_client_tokens(
@@ -190,6 +191,7 @@ async def health() -> dict[str, Any]:
 async def create_session(
     request: Request,
     x_cnc_app_token: str | None = Header(default=None),
+    x_cnc_install_id: str | None = Header(default=None),
 ) -> SessionResponse:
     ip = _client_ip(request)
     allowed, retry_after = auth_rate_limiter.allow(f"auth:{ip}")
@@ -201,9 +203,12 @@ async def create_session(
         )
 
     user_id = token_store.authenticate(x_cnc_app_token)
+    if user_id is None and ALLOW_ANONYMOUS_CLIENTS:
+        user_id = anonymous_user_id(x_cnc_install_id)
+
     if user_id is None:
         logger.warning("auth_failed ip=%s", ip)
-        raise HTTPException(status_code=401, detail="CNC Master access token is invalid")
+        raise HTTPException(status_code=401, detail="CNC Master client identity is invalid")
 
     if not session_signer.configured:
         raise HTTPException(status_code=503, detail="Gateway session signing is not configured")
