@@ -20,20 +20,52 @@ def default_identity_path() -> Path:
     return Path.home() / ".config" / "yoshida" / "cnc-master" / "worker-auth.json"
 
 
+def legacy_token_paths() -> list[Path]:
+    paths: list[Path] = []
+    override = os.getenv("CNC_WORKER_LEGACY_TOKEN_FILE", "").strip()
+    if override:
+        paths.append(Path(override).expanduser())
+
+    local_app_data = os.getenv("LOCALAPPDATA", "").strip()
+    if local_app_data:
+        # M3.3 initial private-beta setup used this raw-token file.
+        paths.append(Path(local_app_data) / "CNC-Master" / "secrets" / "gpu-worker.token")
+    return paths
+
+
+def _read_existing_identity(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        token = str(payload.get("worker_token", "")).strip()
+        return token if len(token) >= 24 else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _read_legacy_token() -> str | None:
+    for path in legacy_token_paths():
+        try:
+            token = path.read_text(encoding="utf-8-sig").strip()
+        except OSError:
+            continue
+        if len(token) >= 24:
+            return token
+    return None
+
+
 def load_or_create_worker_token(path: Path | None = None) -> str:
     target = path or default_identity_path()
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    if target.exists():
-        try:
-            payload = json.loads(target.read_text(encoding="utf-8-sig"))
-            token = str(payload.get("worker_token", "")).strip()
-            if len(token) >= 24:
-                return token
-        except (OSError, ValueError, TypeError):
-            pass
+    existing = _read_existing_identity(target)
+    if existing:
+        return existing
 
-    token = secrets.token_urlsafe(40)
+    # Preserve the already paired Render worker credential during migration.
+    token = _read_legacy_token() or secrets.token_urlsafe(40)
+
     temp = target.with_suffix(target.suffix + ".tmp")
     temp.write_text(
         json.dumps({"worker_token": token}, ensure_ascii=False, indent=2) + "\n",

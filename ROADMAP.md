@@ -45,7 +45,7 @@
 Baseline при активном майнинге: около 49.5 с на первый safety-запрос; VRAM ~1.36 → ~6.49 → ~1.36 GB. Производительность с автоматической паузой майнинга будет измерена на M3.5.
 
 ### M3.3 — AI Gateway
-Статус: **реализовано, локальный E2E PASS; ожидает cloud deploy/merge**.
+Статус: **реализовано и проверено end-to-end; ожидает merge**.
 
 - [x] HTTPS-ready FastAPI gateway;
 - [x] outbound WebSocket GPU worker — домашние порты не открываются;
@@ -61,10 +61,10 @@ Baseline при активном майнинге: около 49.5 с на пе�
 - [x] reconnect worker с backoff;
 - [x] unit tests;
 - [x] локальный E2E: auth 200, invalid auth 401, worker connected, AI 200;
-- [ ] deploy gateway в Frankfurt;
-- [ ] WSS E2E через интернет.
+- [x] deploy gateway в Frankfurt;
+- [x] WSS E2E через интернет: auth 200 → WSS worker → Local AI → HTTP 200; при неполных данных `code=""`.
 
-### M3.4 — Android ↔ Local AI
+Render gateway: `cnc-master-ai-gateway.onrender.com`, Frankfurt. Private credentials хранятся на gateway только как SHA-256; raw worker token остаётся локально на ПК. Reconnect worker после Render restart подтверждён.\n\n### M3.4 — Android ↔ Local AI
 - production endpoint;
 - status UI;
 - retry;
