@@ -13,7 +13,8 @@ Android не зависит от конкретной нейросети. Выб
 
 - `providers/base.py` — общий интерфейс и ошибки;
 - `providers/registry.py` — выбор активного provider;
-- `providers/openai_provider.py` — текущий OpenAI Responses provider;
+- `providers/openai_provider.py` — OpenAI Responses provider;
+- `providers/ollama_provider.py` — локальный Ollama provider;
 - `cnc_prompt.py` — единый CNC safety/system prompt;
 - `main.py` — HTTP API, авторизация и нормализация NC-ответа.
 
@@ -39,6 +40,24 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-## M3.2
+### Local provider: Ollama
 
-Следующий provider будет локальным и будет использовать GPU-сервер. Он подключится через registry, поэтому Android endpoint и JSON-формат не изменятся.
+Рекомендуемая стартовая конфигурация для RTX 3080 10 GB:
+
+- `CNC_AI_PROVIDER=ollama`
+- `OLLAMA_BASE_URL=http://127.0.0.1:11434`
+- `OLLAMA_MODEL=qwen2.5-coder:7b-instruct`
+- `OLLAMA_NUM_CTX=8192`
+- `OLLAMA_KEEP_ALIVE=0s`
+
+`OLLAMA_KEEP_ALIVE=0s` намеренно выгружает модель из VRAM после каждого ответа, чтобы не держать память GPU занятой между запросами.
+
+Ollama вызывается через `/api/chat` с JSON Schema для полей `answer`, `code`, `warnings`, `assumptions`.
+
+Для локального запуска из PowerShell:
+
+```powershell
+.\scripts\start-local-ai.ps1
+```
+
+Публично открывать порт Ollama `11434` нельзя. В M3.3 внешний доступ будет идти только через защищённый CNC Master gateway.
