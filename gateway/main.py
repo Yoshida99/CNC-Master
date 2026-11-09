@@ -12,11 +12,23 @@ from pydantic import BaseModel, Field
 try:
     from .broker import WorkerBroker
     from .rate_limit import SlidingWindowRateLimiter
-    from .security import SecurityConfigError, SessionSigner, TokenStore, parse_client_tokens
+    from .security import (
+        SecurityConfigError,
+        SessionSigner,
+        TokenStore,
+        parse_client_token_hashes,
+        parse_client_tokens,
+    )
 except ImportError:
     from broker import WorkerBroker
     from rate_limit import SlidingWindowRateLimiter
-    from security import SecurityConfigError, SessionSigner, TokenStore, parse_client_tokens
+    from security import (
+        SecurityConfigError,
+        SessionSigner,
+        TokenStore,
+        parse_client_token_hashes,
+        parse_client_tokens,
+    )
 
 
 logging.basicConfig(
@@ -38,13 +50,18 @@ try:
         os.getenv("CNC_CLIENT_TOKENS_JSON", ""),
         os.getenv("CNC_APP_TOKEN", ""),
     )
+    client_token_hashes = parse_client_token_hashes(
+        os.getenv("CNC_CLIENT_TOKEN_HASHES_JSON", "")
+    )
 except SecurityConfigError:
     logger.exception("client_token_configuration_invalid")
     client_tokens = {}
+    client_token_hashes = {}
 
-token_store = TokenStore(client_tokens)
+token_store = TokenStore(client_tokens, client_token_hashes)
 session_signer = SessionSigner(os.getenv("CNC_SESSION_SECRET", ""), SESSION_TTL_SECONDS)
 worker_token = os.getenv("CNC_WORKER_TOKEN", "").strip()
+worker_token_sha256 = os.getenv("CNC_WORKER_TOKEN_SHA256", "").strip().lower()
 
 rate_limiter = SlidingWindowRateLimiter(RATE_LIMIT, RATE_WINDOW_SECONDS)
 auth_rate_limiter = SlidingWindowRateLimiter(max(5, RATE_LIMIT), RATE_WINDOW_SECONDS)
@@ -161,7 +178,7 @@ async def health() -> dict[str, Any]:
     return {
         "ok": True,
         "auth_configured": token_store.configured and session_signer.configured,
-        "worker_auth_configured": bool(worker_token),
+        "worker_auth_configured": bool(worker_token or len(worker_token_sha256) == 64),
         "worker_connected": broker.connected,
         "worker_id": broker.worker_id if broker.connected else "",
         "queue_depth": broker.queue_depth,
@@ -228,7 +245,14 @@ async def worker_websocket(websocket: WebSocket) -> None:
     supplied_token = websocket.headers.get("x-cnc-worker-token", "")
     worker_id = websocket.headers.get("x-cnc-worker-id", "gpu-worker")
 
-    if not worker_token or not hmac.compare_digest(supplied_token, worker_token):
+    worker_ok = False
+    if worker_token:
+        worker_ok = hmac.compare_digest(supplied_token, worker_token)
+    elif len(worker_token_sha256) == 64 and supplied_token:
+        supplied_hash = __import__("hashlib").sha256(supplied_token.encode("utf-8")).hexdigest()
+        worker_ok = hmac.compare_digest(supplied_hash, worker_token_sha256)
+
+    if not worker_ok:
         await websocket.close(code=1008, reason="worker authentication failed")
         return
 
