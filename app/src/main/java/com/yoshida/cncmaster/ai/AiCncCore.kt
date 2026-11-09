@@ -41,6 +41,8 @@ data class CncSafetyFinding(
     val detail: String,
 )
 
+internal const val CNC_APP_TOKEN_HEADER = "X-CNC-App-Token"
+
 object AiCncApi {
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val client = OkHttpClient.Builder()
@@ -49,7 +51,11 @@ object AiCncApi {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    suspend fun generate(baseUrl: String, request: AiCncRequest): AiCncResult = withContext(Dispatchers.IO) {
+    suspend fun generate(
+        baseUrl: String,
+        appToken: String = "",
+        request: AiCncRequest,
+    ): AiCncResult = withContext(Dispatchers.IO) {
         require(baseUrl.isNotBlank()) { "AI backend ещё не настроен" }
         val endpoint = baseUrl.trimEnd('/') + "/v1/cnc/generate"
 
@@ -64,11 +70,7 @@ object AiCncApi {
             .put("zero_point", request.zeroPoint)
             .put("current_code", request.currentCode)
 
-        val httpRequest = Request.Builder()
-            .url(endpoint)
-            .post(payload.toString().toRequestBody(jsonType))
-            .header("Accept", "application/json")
-            .build()
+        val httpRequest = buildRequest(endpoint, payload.toString(), appToken)
 
         client.newCall(httpRequest).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -87,6 +89,18 @@ object AiCncApi {
                 assumptions = json.stringList("assumptions"),
             )
         }
+    }
+
+    internal fun buildRequest(endpoint: String, payload: String, appToken: String): Request {
+        val builder = Request.Builder()
+            .url(endpoint)
+            .post(payload.toRequestBody(jsonType))
+            .header("Accept", "application/json")
+
+        appToken.trim().takeIf { it.isNotEmpty() }?.let {
+            builder.header(CNC_APP_TOKEN_HEADER, it)
+        }
+        return builder.build()
     }
 
     private fun JSONObject.stringList(name: String): List<String> {
