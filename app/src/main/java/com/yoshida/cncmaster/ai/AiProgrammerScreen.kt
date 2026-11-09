@@ -58,6 +58,7 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val installationId = remember(context) { AiInstallationId.get(context) }
 
     var task by remember { mutableStateOf("") }
     var machine by remember { mutableStateOf("Токарный станок, оси X/Z") }
@@ -161,6 +162,7 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
                                 AiCncApi.generate(
                                     baseUrl = BuildConfig.AI_BACKEND_URL,
                                     appToken = BuildConfig.AI_APP_TOKEN,
+                                    installationId = installationId,
                                     request = AiCncRequest(
                                         message = task,
                                         machine = machine,
