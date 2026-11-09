@@ -26,19 +26,26 @@ Ports `11434` (Ollama) and `8787` (local CNC API) remain bound to localhost and 
 
 ### Android / client
 
-1. Private bootstrap token is supplied in `X-CNC-App-Token`.
-2. `POST /v1/auth/session` returns a short-lived HMAC-signed bearer session.
-3. AI requests use `Authorization: Bearer <session>`.
+Публичный режим не требует общего секрета в APK.
 
-Preferred deployment stores only SHA-256 hashes on the gateway:
+1. При первой установке CNC Master генерирует случайный installation ID и хранит его локально.
+2. Приложение отправляет его только в `POST /v1/auth/session` через `X-CNC-Install-Id`.
+3. Gateway преобразует ID в псевдонимный hash-based user ID и выдаёт короткоживущую HMAC-signed bearer session.
+4. AI-запросы используют только `Authorization: Bearer <session>`.
+
+Для этого режима включается:
+
+```text
+CNC_ALLOW_ANONYMOUS_CLIENTS=true
+```
+
+Для закрытой beta также остаётся режим private bootstrap token. В production можно хранить на gateway только SHA-256:
 
 ```text
 CNC_CLIENT_TOKEN_HASHES_JSON={"yoshida":"<sha256-hex>"}
 ```
 
-The private bootstrap token itself stays only on the client device. Raw `CNC_CLIENT_TOKENS_JSON` remains available only for local/dev migration.
-
-For transitional private builds only, `CNC_ALLOW_LEGACY_TOKEN=true` allows the old header directly on AI requests. Public builds should keep it false.
+`CNC_ALLOW_LEGACY_TOKEN=true` разрешён только как временный migration mode.
 
 ### GPU worker
 
