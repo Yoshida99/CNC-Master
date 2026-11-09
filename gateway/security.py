@@ -28,24 +28,38 @@ class SessionIdentity:
 
 
 class TokenStore:
-    def __init__(self, tokens: dict[str, str]) -> None:
-        cleaned = {
+    def __init__(
+        self,
+        tokens: dict[str, str] | None = None,
+        token_hashes: dict[str, str] | None = None,
+    ) -> None:
+        self._tokens = {
             str(user_id).strip(): str(token).strip()
-            for user_id, token in tokens.items()
+            for user_id, token in (tokens or {}).items()
             if str(user_id).strip() and str(token).strip()
         }
-        self._tokens = cleaned
+        self._token_hashes = {
+            str(user_id).strip(): str(token_hash).strip().lower()
+            for user_id, token_hash in (token_hashes or {}).items()
+            if str(user_id).strip() and len(str(token_hash).strip()) == 64
+        }
 
     @property
     def configured(self) -> bool:
-        return bool(self._tokens)
+        return bool(self._tokens or self._token_hashes)
 
     def authenticate(self, token: str | None) -> str | None:
         candidate = (token or "").strip()
         if not candidate:
             return None
+
         for user_id, expected in self._tokens.items():
             if hmac.compare_digest(candidate, expected):
+                return user_id
+
+        candidate_hash = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
+        for user_id, expected_hash in self._token_hashes.items():
+            if hmac.compare_digest(candidate_hash, expected_hash):
                 return user_id
         return None
 
@@ -106,3 +120,16 @@ def parse_client_tokens(raw_json: str, legacy_token: str = "") -> dict[str, str]
     if legacy_token.strip():
         return {"default": legacy_token.strip()}
     return {}
+
+
+def parse_client_token_hashes(raw_json: str) -> dict[str, str]:
+    raw = raw_json.strip()
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SecurityConfigError("CNC_CLIENT_TOKEN_HASHES_JSON is invalid JSON") from exc
+    if not isinstance(value, dict):
+        raise SecurityConfigError("CNC_CLIENT_TOKEN_HASHES_JSON must be a JSON object")
+    return {str(key): str(item) for key, item in value.items()}
