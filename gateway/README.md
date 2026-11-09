@@ -30,17 +30,19 @@ Ports `11434` (Ollama) and `8787` (local CNC API) remain bound to localhost and 
 2. `POST /v1/auth/session` returns a short-lived HMAC-signed bearer session.
 3. AI requests use `Authorization: Bearer <session>`.
 
-Multiple private users are supported through:
+Preferred deployment stores only SHA-256 hashes on the gateway:
 
 ```text
-CNC_CLIENT_TOKENS_JSON={"yoshida":"<secret>","user2":"<secret>"}
+CNC_CLIENT_TOKEN_HASHES_JSON={"yoshida":"<sha256-hex>"}
 ```
+
+The private bootstrap token itself stays only on the client device. Raw `CNC_CLIENT_TOKENS_JSON` remains available only for local/dev migration.
 
 For transitional private builds only, `CNC_ALLOW_LEGACY_TOKEN=true` allows the old header directly on AI requests. Public builds should keep it false.
 
 ### GPU worker
 
-The PC opens an outbound WebSocket and authenticates with a separate `CNC_WORKER_TOKEN`. The worker secret is never embedded into Android.
+The PC opens an outbound WebSocket with its private worker token. Render stores only `CNC_WORKER_TOKEN_SHA256`; the raw worker token stays on the PC and is never embedded into Android.
 
 ## Limits
 
