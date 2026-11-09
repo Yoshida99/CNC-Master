@@ -80,8 +80,11 @@ jobs:
           echo "$CNC_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cnc-master-release.jks"
           echo "CNC_SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/cnc-master-release.jks" >> "$GITHUB_ENV"
 
-      - name: Validate AI backend Python
-        run: python3 -m compileall -q backend
+      - name: Validate Python services
+        run: python3 -m compileall -q backend gateway worker
+
+      - name: Run gateway unit tests
+        run: python3 -m unittest discover -s gateway/tests -p 'test_*.py'
 
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
