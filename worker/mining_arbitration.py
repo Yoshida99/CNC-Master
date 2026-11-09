@@ -67,7 +67,8 @@ class LifecycleClient:
             raise ArbitrationError("Mining lifecycle credential is invalid")
         self.root = Path(root)
         self.owner_id = owner_id
-        self._bot_token = bot_token
+        seed = ("YoshidaNOIDLocalLifecycle/v1|" + bot_token).encode("ascii")
+        self._secret_key = hashlib.sha256(seed).digest()
         self.clock = clock
         self.sleep = sleep
 
@@ -95,10 +96,6 @@ class LifecycleClient:
         token = _read_env_value(env_path, "TELEGRAM_BOT_TOKEN")
         return cls(root=root, owner_id=owner_id, bot_token=token)
 
-    def _key(self) -> bytes:
-        seed = ("YoshidaNOIDLocalLifecycle/v1|" + self._bot_token).encode("ascii")
-        return hashlib.sha256(seed).digest()
-
     def submit(self, action: str) -> str:
         if action not in ACTIONS:
             raise ArbitrationError("Unsupported mining lifecycle action")
@@ -110,7 +107,7 @@ class LifecycleClient:
         request_id = secrets.token_hex(16)
         issued_at = int(self.clock())
         wire = f"v1|{request_id}|{action}|{self.owner_id}|{issued_at}".encode("ascii")
-        mac = hmac.new(self._key(), wire, hashlib.sha256).hexdigest()
+        mac = hmac.new(self._secret_key, wire, hashlib.sha256).hexdigest()
         payload = {
             "version": 1,
             "request_id": request_id,
