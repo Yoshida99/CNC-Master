@@ -16,10 +16,15 @@
 ## M3 — Local AI / собственная GPU-инфраструктура
 
 ### M3.1 — AI Provider Layer
-- отделить CNC API от конкретного OpenAI provider;
-- единый интерфейс provider;
-- health/status активного provider;
-- совместимость с текущим Android API.
+Статус: **реализовано в ветке `roadmap/m3-1-provider-layer`, ожидает CI/merge**.
+
+- [x] отделить CNC API от конкретного OpenAI provider;
+- [x] единый интерфейс provider;
+- [x] provider registry;
+- [x] health/status активного provider;
+- [x] совместимость с текущим Android API;
+- [x] перенести CNC system prompt в отдельный модуль;
+- [x] CI compileall для всех backend-модулей.
 
 ### M3.2 — локальная LLM
 - локальный inference server;

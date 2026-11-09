@@ -76,11 +76,12 @@ AI-код считается только черновиком. Приложен
 
 ## AI backend
 
-Текущий backend находится в `backend/main.py` и пока использует OpenAI Responses API.
+Backend теперь использует provider layer: Android работает с единым CNC API, а конкретная нейросеть выбирается сервером через `CNC_AI_PROVIDER`. Текущий provider — OpenAI Responses API; Local AI будет подключён на M3.2 без изменения Android-контракта.
 
 Основные переменные:
 
-- `OPENAI_API_KEY` — ключ провайдера;
+- `CNC_AI_PROVIDER` — активный provider (`openai` на M3.1);
+- `OPENAI_API_KEY` — ключ OpenAI provider;
 - `OPENAI_MODEL` — выбранная модель;
 - `CNC_APP_TOKEN` — необязательный общий токен для временного ограничения доступа.
 
