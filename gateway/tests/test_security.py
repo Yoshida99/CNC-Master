@@ -1,7 +1,7 @@
 import hashlib
 import unittest
 
-from gateway.security import SessionSigner, TokenStore, parse_client_tokens
+from gateway.security import SessionSigner, TokenStore, anonymous_user_id, parse_client_tokens
 
 
 class SecurityTests(unittest.TestCase):
@@ -28,6 +28,18 @@ class SecurityTests(unittest.TestCase):
 
     def test_parse_client_tokens_supports_legacy_fallback(self):
         self.assertEqual({"default": "abc"}, parse_client_tokens("", "abc"))
+
+
+    def test_anonymous_installation_id_is_stable_and_pseudonymous(self):
+        first = anonymous_user_id("7f4c7834-5727-4ca8-9c53-5b769fa18e8e")
+        second = anonymous_user_id("7f4c7834-5727-4ca8-9c53-5b769fa18e8e")
+        self.assertEqual(first, second)
+        self.assertTrue(first.startswith("anon:"))
+        self.assertNotIn("7f4c7834", first)
+
+    def test_anonymous_installation_id_rejects_invalid_values(self):
+        self.assertIsNone(anonymous_user_id("short"))
+        self.assertIsNone(anonymous_user_id("bad value with spaces"))
 
 
 if __name__ == "__main__":
