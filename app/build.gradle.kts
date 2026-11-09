@@ -14,7 +14,7 @@ val cncVersionName = providers.gradleProperty("CNC_VERSION_NAME")
         providers.environmentVariable("GITHUB_RUN_NUMBER")
             .map { "0.2." + it }
     )
-    .orElse("0.2.0")
+    .orElse("0.2.1")
     .get()
 
 val updateManifestUrl = providers.gradleProperty("CNC_UPDATE_MANIFEST_URL")
@@ -23,6 +23,11 @@ val updateManifestUrl = providers.gradleProperty("CNC_UPDATE_MANIFEST_URL")
 
 val aiBackendUrl = providers.gradleProperty("CNC_AI_BACKEND_URL")
     .orElse(providers.environmentVariable("CNC_AI_BACKEND_URL"))
+    .orElse("")
+    .get()
+
+val aiAppToken = providers.gradleProperty("CNC_APP_TOKEN")
+    .orElse(providers.environmentVariable("CNC_APP_TOKEN"))
     .orElse("")
     .get()
 
@@ -49,6 +54,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
         buildConfigField("String", "AI_BACKEND_URL", "\"$aiBackendUrl\"")
+        buildConfigField("String", "AI_APP_TOKEN", "\"$aiAppToken\"")
     }
 
     signingConfigs {

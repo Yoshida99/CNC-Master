@@ -7,7 +7,7 @@ import httpx
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="CNC Master AI", version="0.1.0")
+app = FastAPI(title="CNC Master AI", version="0.2.0")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra").strip() or "gpt-5.6-terra"
@@ -65,8 +65,10 @@ The user may be an experienced CNC setup operator. Be technical and concise, but
 async def health() -> dict[str, Any]:
     return {
         "ok": True,
+        "provider": "openai",
         "model": OPENAI_MODEL,
         "ai_configured": bool(OPENAI_API_KEY),
+        "auth_required": bool(CNC_APP_TOKEN),
     }
 
 

@@ -13,7 +13,7 @@ on:
       release_version:
         description: "Release version, for example 0.2.1"
         required: true
-        default: "0.2.1"
+        default: "0.3.0"
 
 jobs:
   build:
@@ -26,6 +26,7 @@ jobs:
       CNC_KEY_PASSWORD: ${{ secrets.CNC_KEY_PASSWORD }}
       CNC_KEYSTORE_BASE64: ${{ secrets.CNC_KEYSTORE_BASE64 }}
       CNC_AI_BACKEND_URL: ${{ vars.CNC_AI_BACKEND_URL }}
+      CNC_APP_TOKEN: ${{ secrets.CNC_APP_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
