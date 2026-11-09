@@ -45,7 +45,7 @@
 Baseline при активном майнинге: около 49.5 с на первый safety-запрос; VRAM ~1.36 → ~6.49 → ~1.36 GB. Производительность с автоматической паузой майнинга будет измерена на M3.5.
 
 ### M3.3 — AI Gateway
-Статус: **реализовано, локальный E2E PASS; ожидает cloud deploy/merge**.
+Статус: **завершено и слито в `main`; production WSS E2E PASS**.
 
 - [x] HTTPS-ready FastAPI gateway;
 - [x] outbound WebSocket GPU worker — домашние порты не открываются;
@@ -61,14 +61,23 @@ Baseline при активном майнинге: около 49.5 с на пе�
 - [x] reconnect worker с backoff;
 - [x] unit tests;
 - [x] локальный E2E: auth 200, invalid auth 401, worker connected, AI 200;
-- [ ] deploy gateway в Frankfurt;
-- [ ] WSS E2E через интернет.
+- [x] production gateway на Render Frankfurt;
+- [x] WSS E2E через интернет: session 200 → gateway → GPU worker → Local AI → RTX 3080 → 200;
+- [x] production health: auth configured, anonymous clients enabled, worker connected, queue 0/8.
 
 ### M3.4 — Android ↔ Local AI
-- production endpoint;
-- status UI;
-- retry;
-- понятный offline/fallback режим.
+Статус: **в работе**.
+
+- [x] production endpoint `https://cnc-master-ai-gateway-main.onrender.com`;
+- [x] GitHub variable `CNC_AI_BACKEND_URL`;
+- [x] Android health/status для gateway и GPU worker;
+- [x] увеличенный connect timeout для cold start;
+- [x] ручной retry запроса;
+- [x] ручное обновление AI status;
+- [x] понятный offline/fallback режим: редактор, safety-check и USB export остаются доступны;
+- [x] remote E2E smoke test без вывода bearer token;
+- [x] Windows startup script находит Ollama даже если он не в PATH;
+- [ ] Android CI и merge M3.4.
 
 ### M3.5 — GPU arbitration
 - интеграция с Yoshida Mining Agent;

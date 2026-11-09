@@ -29,6 +29,17 @@ data class AiCncResult(
     val assumptions: List<String>,
 )
 
+data class AiBackendHealth(
+    val serverOnline: Boolean,
+    val aiOnline: Boolean,
+    val workerConnected: Boolean?,
+    val workerId: String,
+    val provider: String,
+    val model: String,
+    val queueDepth: Int,
+    val queueMax: Int,
+)
+
 enum class CncRiskLevel(val title: String) {
     INFO("Инфо"),
     WARNING("Проверить"),
@@ -46,7 +57,7 @@ internal const val CNC_APP_TOKEN_HEADER = "X-CNC-App-Token"
 object AiCncApi {
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(270, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
@@ -72,6 +83,49 @@ object AiCncApi {
 
     @Volatile
     private var cachedSession: GatewaySession? = null
+
+    suspend fun checkHealth(baseUrl: String): AiBackendHealth = withContext(Dispatchers.IO) {
+        require(baseUrl.isNotBlank()) { "AI backend ещё не настроен" }
+        val endpoint = baseUrl.trimEnd('/') + "/health"
+        val request = Request.Builder()
+            .url(endpoint)
+            .get()
+            .header("Accept", "application/json")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                error("AI health вернул HTTP ${response.code}")
+            }
+            parseHealth(body)
+        }
+    }
+
+    internal fun parseHealth(body: String): AiBackendHealth {
+        val json = JSONObject(body)
+        val serverOnline = json.optBoolean("ok", false)
+        val workerConnected = if (json.has("worker_connected")) {
+            json.optBoolean("worker_connected", false)
+        } else {
+            null
+        }
+        val aiConfigured = if (json.has("ai_configured")) {
+            json.optBoolean("ai_configured", false)
+        } else {
+            true
+        }
+        return AiBackendHealth(
+            serverOnline = serverOnline,
+            aiOnline = serverOnline && aiConfigured && workerConnected != false,
+            workerConnected = workerConnected,
+            workerId = json.optString("worker_id"),
+            provider = json.optString("provider"),
+            model = json.optString("model"),
+            queueDepth = json.optInt("queue_depth", 0),
+            queueMax = json.optInt("queue_max", 0),
+        )
+    }
 
     suspend fun generate(
         baseUrl: String,

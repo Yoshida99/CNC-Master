@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +75,9 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
     var assumptions by remember { mutableStateOf(emptyList<String>()) }
     var errorText by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
+    var backendHealth by remember { mutableStateOf<AiBackendHealth?>(null) }
+    var healthLoading by remember { mutableStateOf(false) }
+    var healthError by remember { mutableStateOf("") }
     var exportAcknowledged by remember { mutableStateOf(false) }
 
     val backendAvailable = BuildConfig.AI_BACKEND_URL.isNotBlank()
@@ -93,6 +97,104 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
             Toast.makeText(context, "NC-файл сохранён. Перед запуском проверь его на станке.", Toast.LENGTH_LONG).show()
         }.onFailure {
             Toast.makeText(context, "Ошибка сохранения: ${it.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+
+    LaunchedEffect(backendAvailable) {
+        if (!backendAvailable) {
+            backendHealth = null
+            healthError = ""
+            return@LaunchedEffect
+        }
+        healthLoading = true
+        runCatching {
+            AiCncApi.checkHealth(BuildConfig.AI_BACKEND_URL)
+        }.onSuccess {
+            backendHealth = it
+            healthError = ""
+        }.onFailure {
+            backendHealth = null
+            healthError = it.message ?: "Нет связи с AI-сервером"
+        }
+        healthLoading = false
+    }
+
+    val refreshHealth: () -> Unit = {
+        if (backendAvailable && !healthLoading) {
+            healthLoading = true
+            scope.launch {
+                runCatching {
+                    AiCncApi.checkHealth(BuildConfig.AI_BACKEND_URL)
+                }.onSuccess {
+                    backendHealth = it
+                    healthError = ""
+                }.onFailure {
+                    backendHealth = null
+                    healthError = it.message ?: "Нет связи с AI-сервером"
+                }
+                healthLoading = false
+            }
+        }
+    }
+
+    val requestAi: () -> Unit = requestAi@{
+        if (!backendAvailable) {
+            errorText = "AI backend ещё не подключён. Редактор, проверка и экспорт работают офлайн."
+            return@requestAi
+        }
+        if (task.isBlank()) {
+            errorText = "Сначала опиши задачу."
+            return@requestAi
+        }
+        if (loading) return@requestAi
+
+        loading = true
+        errorText = ""
+        scope.launch {
+            runCatching {
+                AiCncApi.generate(
+                    baseUrl = BuildConfig.AI_BACKEND_URL,
+                    appToken = BuildConfig.AI_APP_TOKEN,
+                    installationId = installationId,
+                    request = AiCncRequest(
+                        message = task,
+                        machine = machine,
+                        control = control,
+                        material = material,
+                        stock = stock,
+                        tools = tools,
+                        workholding = workholding,
+                        zeroPoint = zeroPoint,
+                        currentCode = code,
+                    ),
+                )
+            }.onSuccess { result ->
+                answer = result.answer
+                aiWarnings = result.warnings
+                assumptions = result.assumptions
+                if (result.code.isNotBlank()) code = result.code
+                runCatching {
+                    AiCncApi.checkHealth(BuildConfig.AI_BACKEND_URL)
+                }.onSuccess {
+                    backendHealth = it
+                    healthError = ""
+                }
+            }.onFailure { failure ->
+                val health = runCatching {
+                    AiCncApi.checkHealth(BuildConfig.AI_BACKEND_URL)
+                }.getOrNull()
+                backendHealth = health
+                errorText = when {
+                    health?.serverOnline == true && health.workerConnected == false ->
+                        "AI-сервер доступен, но GPU worker сейчас офлайн. Редактор, локальная проверка и USB-экспорт продолжают работать."
+                    health == null ->
+                        "Нет связи с AI-сервером. Проверь интернет и повтори запрос. Редактор и локальная проверка работают офлайн."
+                    else ->
+                        failure.message ?: "Не удалось получить ответ AI"
+                }
+            }
+            loading = false
         }
     }
 
@@ -118,7 +220,13 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                SafetyHeaderCard(backendAvailable)
+                SafetyHeaderCard(
+                    backendAvailable = backendAvailable,
+                    health = backendHealth,
+                    checking = healthLoading,
+                    healthError = healthError,
+                    onRefresh = refreshHealth,
+                )
             }
 
             item {
@@ -146,46 +254,7 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
 
             item {
                 Button(
-                    onClick = {
-                        if (!backendAvailable) {
-                            errorText = "AI backend ещё не подключён. Редактор, проверка и экспорт уже работают офлайн."
-                            return@Button
-                        }
-                        if (task.isBlank()) {
-                            errorText = "Сначала опиши задачу."
-                            return@Button
-                        }
-                        loading = true
-                        errorText = ""
-                        scope.launch {
-                            runCatching {
-                                AiCncApi.generate(
-                                    baseUrl = BuildConfig.AI_BACKEND_URL,
-                                    appToken = BuildConfig.AI_APP_TOKEN,
-                                    installationId = installationId,
-                                    request = AiCncRequest(
-                                        message = task,
-                                        machine = machine,
-                                        control = control,
-                                        material = material,
-                                        stock = stock,
-                                        tools = tools,
-                                        workholding = workholding,
-                                        zeroPoint = zeroPoint,
-                                        currentCode = code,
-                                    ),
-                                )
-                            }.onSuccess { result ->
-                                answer = result.answer
-                                aiWarnings = result.warnings
-                                assumptions = result.assumptions
-                                if (result.code.isNotBlank()) code = result.code
-                            }.onFailure {
-                                errorText = it.message ?: "Не удалось получить ответ AI"
-                            }
-                            loading = false
-                        }
-                    },
+                    onClick = requestAi,
                     enabled = !loading,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -199,6 +268,21 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
                 if (errorText.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Text(errorText, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = requestAi,
+                            enabled = backendAvailable && task.isNotBlank() && !loading,
+                        ) {
+                            Text("Повторить запрос")
+                        }
+                        OutlinedButton(
+                            onClick = refreshHealth,
+                            enabled = backendAvailable && !healthLoading,
+                        ) {
+                            Text("Проверить AI")
+                        }
+                    }
                 }
             }
 
@@ -328,7 +412,31 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun SafetyHeaderCard(backendAvailable: Boolean) {
+private fun SafetyHeaderCard(
+    backendAvailable: Boolean,
+    health: AiBackendHealth?,
+    checking: Boolean,
+    healthError: String,
+    onRefresh: () -> Unit,
+) {
+    val statusText = when {
+        !backendAvailable ->
+            "AI endpoint не настроен. Редактор, локальная проверка и USB-экспорт работают офлайн."
+        checking ->
+            "Проверяю защищённое соединение с AI…"
+        health?.aiOnline == true -> buildString {
+            append("AI онлайн")
+            if (health.workerId.isNotBlank()) append(" · GPU worker подключён")
+            if (health.queueMax > 0) append(" · очередь ${health.queueDepth}/${health.queueMax}")
+        }
+        health?.serverOnline == true && health.workerConnected == false ->
+            "Gateway онлайн, но GPU worker сейчас офлайн. Локальные функции CNC Master продолжают работать."
+        healthError.isNotBlank() ->
+            "AI временно недоступен. Редактор, проверка G-кода и экспорт доступны офлайн."
+        else ->
+            "AI endpoint настроен. Нажми «Проверить AI», чтобы обновить состояние."
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF121B23)),
         shape = RoundedCornerShape(20.dp),
@@ -337,12 +445,29 @@ private fun SafetyHeaderCard(backendAvailable: Boolean) {
             Text("AI + редактор NC", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary, fontSize = 20.sp)
             Spacer(Modifier.height(5.dp))
             Text(
-                if (backendAvailable)
-                    "AI подключён через защищённый сервер. Сгенерированный код остаётся черновиком до проверки на станке."
-                else
-                    "Редактор, локальная проверка и USB-экспорт работают офлайн. Для генерации AI требуется подключить сервер.",
+                statusText,
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .78f),
+            )
+            if (backendAvailable) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onRefresh,
+                    enabled = !checking,
+                ) {
+                    if (checking) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text("  Проверяю…")
+                    } else {
+                        Text("Проверить AI")
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Сгенерированный NC-код всегда остаётся черновиком до проверки на конкретном станке.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .56f),
             )
         }
     }
