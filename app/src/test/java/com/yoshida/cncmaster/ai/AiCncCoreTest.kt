@@ -3,6 +3,7 @@ package com.yoshida.cncmaster.ai
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AiCncCoreTest {
@@ -65,4 +66,27 @@ class AiCncCoreTest {
         assertTrue(exported.all { it == '\r' || it == '\n' || it == '\t' || it.code in 32..126 })
         assertFalse(exported.contains("ТЕСТ"))
     }
+
+    @Test
+    fun `AI request sends configured app token`() {
+        val request = AiCncApi.buildRequest(
+            endpoint = "https://example.com/v1/cnc/generate",
+            payload = "{}",
+            appToken = "  test-token  ",
+        )
+
+        assertEquals("test-token", request.header(CNC_APP_TOKEN_HEADER))
+    }
+
+    @Test
+    fun `AI request omits empty app token`() {
+        val request = AiCncApi.buildRequest(
+            endpoint = "https://example.com/v1/cnc/generate",
+            payload = "{}",
+            appToken = "   ",
+        )
+
+        assertNull(request.header(CNC_APP_TOKEN_HEADER))
+    }
+
 }
