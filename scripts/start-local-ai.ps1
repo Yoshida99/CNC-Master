@@ -10,7 +10,16 @@ Set-Location $RepoRoot
 
 $Ollama = Get-Command ollama -ErrorAction SilentlyContinue
 if (-not $Ollama) {
-    throw "Ollama не найден. Установи Ollama и повтори запуск."
+    $OllamaCandidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Ollama\ollama.exe'),
+        'C:\Program Files\Ollama\ollama.exe'
+    )
+    $OllamaPath = $OllamaCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $OllamaPath) {
+        throw "Ollama не найден. Установи Ollama и повтори запуск."
+    }
+    $Ollama = Get-Item $OllamaPath
 }
 
 $Python = Get-Command python -ErrorAction SilentlyContinue
