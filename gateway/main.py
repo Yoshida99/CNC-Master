@@ -16,6 +16,7 @@ try:
         SecurityConfigError,
         SessionSigner,
         TokenStore,
+        anonymous_user_id,
         parse_client_token_hashes,
         parse_client_tokens,
     )
@@ -178,7 +179,8 @@ def _enforce_rate_limit(user_id: str) -> None:
 async def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "auth_configured": token_store.configured and session_signer.configured,
+        "auth_configured": session_signer.configured and (token_store.configured or ALLOW_ANONYMOUS_CLIENTS),
+        "anonymous_clients": ALLOW_ANONYMOUS_CLIENTS,
         "worker_auth_configured": bool(worker_token or len(worker_token_sha256) == 64),
         "worker_connected": broker.connected,
         "worker_id": broker.worker_id if broker.connected else "",
