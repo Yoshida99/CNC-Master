@@ -89,4 +89,29 @@ class AiCncCoreTest {
         assertNull(request.header(CNC_APP_TOKEN_HEADER))
     }
 
+
+    @Test
+    fun `gateway session request sends bootstrap app token`() {
+        val request = AiCncApi.buildSessionRequest(
+            endpoint = "https://example.com/v1/auth/session",
+            appToken = " bootstrap-token ",
+        )
+
+        assertEquals("bootstrap-token", request.header(CNC_APP_TOKEN_HEADER))
+        assertNull(request.header("Authorization"))
+    }
+
+    @Test
+    fun `AI request prefers bearer session over app token`() {
+        val request = AiCncApi.buildRequest(
+            endpoint = "https://example.com/v1/cnc/generate",
+            payload = "{}",
+            appToken = "legacy-token",
+            bearerToken = "session-token",
+        )
+
+        assertEquals("Bearer session-token", request.header("Authorization"))
+        assertNull(request.header(CNC_APP_TOKEN_HEADER))
+    }
+
 }
