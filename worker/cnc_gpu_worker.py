@@ -11,6 +11,11 @@ from typing import Any
 import httpx
 import websockets
 
+try:
+    from .identity import load_or_create_worker_token
+except ImportError:
+    from identity import load_or_create_worker_token
+
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -19,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger("cnc.gpu_worker")
 
 GATEWAY_WS_URL = os.getenv("CNC_GATEWAY_WS_URL", "").strip()
-WORKER_TOKEN = os.getenv("CNC_WORKER_TOKEN", "").strip()
+WORKER_TOKEN = os.getenv("CNC_WORKER_TOKEN", "").strip() or load_or_create_worker_token()
 WORKER_ID = os.getenv("CNC_WORKER_ID", socket.gethostname()).strip()[:80]
 LOCAL_CNC_URL = os.getenv("CNC_LOCAL_AI_URL", "http://127.0.0.1:8787").rstrip("/")
 LOCAL_TIMEOUT_SECONDS = float(os.getenv("CNC_LOCAL_AI_TIMEOUT_SECONDS", "300"))
