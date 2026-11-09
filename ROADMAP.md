@@ -45,12 +45,24 @@
 Baseline при активном майнинге: около 49.5 с на первый safety-запрос; VRAM ~1.36 → ~6.49 → ~1.36 GB. Производительность с автоматической паузой майнинга будет измерена на M3.5.
 
 ### M3.3 — AI Gateway
-- HTTPS;
-- пользовательская авторизация;
-- rate limit;
-- лимиты размера запросов;
-- queue/timeout;
-- журнал технических ошибок без хранения лишнего содержимого программ.
+Статус: **реализовано, локальный E2E PASS; ожидает cloud deploy/merge**.
+
+- [x] HTTPS-ready FastAPI gateway;
+- [x] outbound WebSocket GPU worker — домашние порты не открываются;
+- [x] короткоживущие bearer-сессии;
+- [x] публичная per-install авторизация без общего секрета в APK;
+- [x] private token mode с SHA-256 на gateway;
+- [x] отдельный worker token; gateway может хранить только SHA-256;
+- [x] rate limit;
+- [x] лимит размера запроса;
+- [x] queue/timeout;
+- [x] request ID;
+- [x] технические логи без prompt/NC-кода;
+- [x] reconnect worker с backoff;
+- [x] unit tests;
+- [x] локальный E2E: auth 200, invalid auth 401, worker connected, AI 200;
+- [ ] deploy gateway в Frankfurt;
+- [ ] WSS E2E через интернет.
 
 ### M3.4 — Android ↔ Local AI
 - production endpoint;

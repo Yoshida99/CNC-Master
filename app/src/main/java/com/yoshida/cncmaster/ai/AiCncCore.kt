@@ -47,17 +47,41 @@ object AiCncApi {
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
+        .readTimeout(270, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    private data class GatewaySession(
+        val baseUrl: String,
+        val bootstrapToken: String,
+        val accessToken: String,
+        val expiresAtEpochSeconds: Long,
+    )
+
+    private data class RequestAuth(
+        val appToken: String = "",
+        val bearerToken: String = "",
+    )
+
+    private data class HttpAttempt(
+        val code: Int,
+        val body: String,
+    )
+
+    private val sessionLock = Any()
+
+    @Volatile
+    private var cachedSession: GatewaySession? = null
 
     suspend fun generate(
         baseUrl: String,
         appToken: String = "",
+        installationId: String = "",
         request: AiCncRequest,
     ): AiCncResult = withContext(Dispatchers.IO) {
         require(baseUrl.isNotBlank()) { "AI backend ещё не настроен" }
-        val endpoint = baseUrl.trimEnd('/') + "/v1/cnc/generate"
+        val normalizedBaseUrl = baseUrl.trimEnd('/')
+        val endpoint = normalizedBaseUrl + "/v1/cnc/generate"
 
         val payload = JSONObject()
             .put("message", request.message)
@@ -69,35 +93,154 @@ object AiCncApi {
             .put("workholding", request.workholding)
             .put("zero_point", request.zeroPoint)
             .put("current_code", request.currentCode)
+            .toString()
 
-        val httpRequest = buildRequest(endpoint, payload.toString(), appToken)
+        var auth = resolveAuth(normalizedBaseUrl, appToken, installationId)
+        var attempt = performGenerate(endpoint, payload, auth)
 
-        client.newCall(httpRequest).execute().use { response ->
-            val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                val message = runCatching { JSONObject(body).optString("detail") }.getOrNull()
-                    ?.takeIf { it.isNotBlank() }
-                    ?: "AI backend вернул HTTP ${response.code}"
-                error(message)
+        if (attempt.code == 401 && auth.bearerToken.isNotBlank()) {
+            invalidateSession()
+            auth = resolveAuth(normalizedBaseUrl, appToken, installationId, forceRefresh = true)
+            attempt = performGenerate(endpoint, payload, auth)
+        }
+
+        if (attempt.code !in 200..299) {
+            val message = runCatching { JSONObject(attempt.body).optString("detail") }.getOrNull()
+                ?.takeIf { it.isNotBlank() }
+                ?: "AI backend вернул HTTP ${attempt.code}"
+            error(message)
+        }
+
+        val json = JSONObject(attempt.body)
+        AiCncResult(
+            answer = json.optString("answer"),
+            code = json.optString("code"),
+            warnings = json.stringList("warnings"),
+            assumptions = json.stringList("assumptions"),
+        )
+    }
+
+    private fun resolveAuth(
+        baseUrl: String,
+        appToken: String,
+        installationId: String,
+        forceRefresh: Boolean = false,
+    ): RequestAuth {
+        val bootstrapToken = appToken.trim()
+        val installId = installationId.trim()
+        if (bootstrapToken.isEmpty() && installId.isEmpty()) {
+            return RequestAuth()
+        }
+
+        synchronized(sessionLock) {
+            val now = System.currentTimeMillis() / 1000
+            val cached = cachedSession
+            if (!forceRefresh &&
+                cached != null &&
+                cached.baseUrl == baseUrl &&
+                cached.bootstrapToken == "$bootstrapToken|$installId" &&
+                cached.expiresAtEpochSeconds > now + 30
+            ) {
+                return RequestAuth(bearerToken = cached.accessToken)
             }
 
-            val json = JSONObject(body)
-            AiCncResult(
-                answer = json.optString("answer"),
-                code = json.optString("code"),
-                warnings = json.stringList("warnings"),
-                assumptions = json.stringList("assumptions"),
+            val authEndpoint = baseUrl + "/v1/auth/session"
+            val request = buildSessionRequest(authEndpoint, bootstrapToken, installId)
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+
+                // Direct/local backend from M2.2 has no session endpoint.
+                // Preserve compatibility there by falling back to the legacy app-token header.
+                if (response.code == 404 || response.code == 405) {
+                    return RequestAuth(appToken = bootstrapToken)
+                }
+
+                if (!response.isSuccessful) {
+                    val message = runCatching { JSONObject(body).optString("detail") }.getOrNull()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "AI gateway auth вернул HTTP ${response.code}"
+                    error(message)
+                }
+
+                val json = JSONObject(body)
+                val accessToken = json.optString("access_token").trim()
+                if (accessToken.isEmpty()) {
+                    error("AI gateway не вернул access token")
+                }
+
+                val expiresAt = json.optLong(
+                    "expires_at",
+                    now + json.optLong("expires_in", 300).coerceAtLeast(60),
+                )
+                cachedSession = GatewaySession(
+                    baseUrl = baseUrl,
+                    bootstrapToken = "$bootstrapToken|$installId",
+                    accessToken = accessToken,
+                    expiresAtEpochSeconds = expiresAt,
+                )
+                return RequestAuth(bearerToken = accessToken)
+            }
+        }
+    }
+
+    private fun performGenerate(
+        endpoint: String,
+        payload: String,
+        auth: RequestAuth,
+    ): HttpAttempt {
+        val httpRequest = buildRequest(
+            endpoint = endpoint,
+            payload = payload,
+            appToken = auth.appToken,
+            bearerToken = auth.bearerToken,
+        )
+        client.newCall(httpRequest).execute().use { response ->
+            return HttpAttempt(
+                code = response.code,
+                body = response.body?.string().orEmpty(),
             )
         }
     }
 
-    internal fun buildRequest(endpoint: String, payload: String, appToken: String): Request {
+    private fun invalidateSession() {
+        synchronized(sessionLock) {
+            cachedSession = null
+        }
+    }
+
+    internal fun buildSessionRequest(
+        endpoint: String,
+        appToken: String = "",
+        installationId: String = "",
+    ): Request {
+        val builder = Request.Builder()
+            .url(endpoint)
+            .post("{}".toRequestBody(jsonType))
+            .header("Accept", "application/json")
+
+        appToken.trim().takeIf { it.isNotEmpty() }?.let {
+            builder.header(CNC_APP_TOKEN_HEADER, it)
+        }
+        installationId.trim().takeIf { it.isNotEmpty() }?.let {
+            builder.header("X-CNC-Install-Id", it)
+        }
+        return builder.build()
+    }
+
+    internal fun buildRequest(
+        endpoint: String,
+        payload: String,
+        appToken: String = "",
+        bearerToken: String = "",
+    ): Request {
         val builder = Request.Builder()
             .url(endpoint)
             .post(payload.toRequestBody(jsonType))
             .header("Accept", "application/json")
 
-        appToken.trim().takeIf { it.isNotEmpty() }?.let {
+        bearerToken.trim().takeIf { it.isNotEmpty() }?.let {
+            builder.header("Authorization", "Bearer $it")
+        } ?: appToken.trim().takeIf { it.isNotEmpty() }?.let {
             builder.header(CNC_APP_TOKEN_HEADER, it)
         }
         return builder.build()
