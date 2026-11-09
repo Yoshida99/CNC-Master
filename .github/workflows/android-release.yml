@@ -81,7 +81,7 @@ jobs:
           echo "CNC_SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/cnc-master-release.jks" >> "$GITHUB_ENV"
 
       - name: Validate AI backend Python
-        run: python3 -m py_compile backend/main.py
+        run: python3 -m compileall -q backend
 
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace

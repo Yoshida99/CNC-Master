@@ -4,22 +4,27 @@
 
 ## M2.2 — стабилизация v0.2.1
 
-Статус: **в работе**.
+Статус: **завершено и слито в `main`**.
 
 - [x] Ограничить хранение новых GitHub Actions APK-артефактов.
 - [x] Синхронизировать README с фактическим v0.2.1.
 - [x] Добавить QA для AI-программиста.
 - [x] Исправить несовпадение backend `CNC_APP_TOKEN` и Android-клиента.
 - [x] Добавить unit-тесты заголовка AI app token.
-- [ ] Проверить CI ветки и слить M2.2 в `main`.
+- [x] Проверить CI ветки и слить M2.2 в `main`.
 
 ## M3 — Local AI / собственная GPU-инфраструктура
 
 ### M3.1 — AI Provider Layer
-- отделить CNC API от конкретного OpenAI provider;
-- единый интерфейс provider;
-- health/status активного provider;
-- совместимость с текущим Android API.
+Статус: **реализовано в ветке `roadmap/m3-1-provider-layer`, ожидает CI/merge**.
+
+- [x] отделить CNC API от конкретного OpenAI provider;
+- [x] единый интерфейс provider;
+- [x] provider registry;
+- [x] health/status активного provider;
+- [x] совместимость с текущим Android API;
+- [x] перенести CNC system prompt в отдельный модуль;
+- [x] CI compileall для всех backend-модулей.
 
 ### M3.2 — локальная LLM
 - локальный inference server;
