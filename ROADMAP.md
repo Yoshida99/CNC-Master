@@ -66,7 +66,7 @@ Baseline при активном майнинге: около 49.5 с на пе�
 - [x] production health: auth configured, anonymous clients enabled, worker connected, queue 0/8.
 
 ### M3.4 — Android ↔ Local AI
-Статус: **в работе**.
+Статус: **завершено и слито в `main`**.
 
 - [x] production endpoint `https://cnc-master-ai-gateway-main.onrender.com`;
 - [x] GitHub variable `CNC_AI_BACKEND_URL`;
@@ -77,13 +77,21 @@ Baseline при активном майнинге: около 49.5 с на пе�
 - [x] понятный offline/fallback режим: редактор, safety-check и USB export остаются доступны;
 - [x] remote E2E smoke test без вывода bearer token;
 - [x] Windows startup script находит Ollama даже если он не в PATH;
-- [ ] Android CI и merge M3.4.
+- [x] Android CI и merge M3.4.
 
 ### M3.5 — GPU arbitration
-- интеграция с Yoshida Mining Agent;
-- пауза/снижение майнинга перед inference;
-- освобождение VRAM;
-- автоматическое восстановление майнинга после ответа.
+Статус: **в работе**.
+
+- [x] интеграция с signed lifecycle Yoshida Mining Monitor;
+- [x] fail-closed pause перед inference;
+- [x] майнинг не трогается, если он уже вручную paused/stopped;
+- [x] automatic resume только для AI-инициированной паузы;
+- [x] ручной pause/stop во время AI имеет приоритет над auto-resume;
+- [x] lease + crash recovery;
+- [x] worker unit tests;
+- [ ] live benchmark pause → inference → resume на RTX 3080;
+- [ ] установить recovery Scheduled Task;
+- [ ] включить arbitration в production GPU worker после PASS benchmark.
 
 ### M3.6 — очередь запросов
 - последовательная обработка при нехватке VRAM;

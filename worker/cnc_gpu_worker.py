@@ -13,8 +13,10 @@ import websockets
 
 try:
     from .identity import load_or_create_worker_token
+    from .mining_arbitration import ArbitrationError, MiningArbitrator
 except ImportError:
     from identity import load_or_create_worker_token
+    from mining_arbitration import ArbitrationError, MiningArbitrator
 
 
 logging.basicConfig(
@@ -28,6 +30,7 @@ WORKER_TOKEN = os.getenv("CNC_WORKER_TOKEN", "").strip() or load_or_create_worke
 WORKER_ID = os.getenv("CNC_WORKER_ID", socket.gethostname()).strip()[:80]
 LOCAL_CNC_URL = os.getenv("CNC_LOCAL_AI_URL", "http://127.0.0.1:8787").rstrip("/")
 LOCAL_TIMEOUT_SECONDS = float(os.getenv("CNC_LOCAL_AI_TIMEOUT_SECONDS", "300"))
+MINING_ARBITRATOR = MiningArbitrator.from_env()
 
 
 async def _process_job(client: httpx.AsyncClient, message: dict[str, Any]) -> dict[str, Any]:
@@ -41,7 +44,22 @@ async def _process_job(client: httpx.AsyncClient, message: dict[str, Any]) -> di
         }
 
     started = time.monotonic()
+    lease = None
     try:
+        try:
+            lease = await asyncio.to_thread(MINING_ARBITRATOR.acquire)
+        except ArbitrationError as exc:
+            logger.error(
+                "mining_arbitration_acquire_failed request_id=%s error=%s",
+                request_id,
+                type(exc).__name__,
+            )
+            return {
+                "type": "error",
+                "request_id": request_id,
+                "detail": "GPU is temporarily unavailable",
+            }
+
         response = await client.post(
             f"{LOCAL_CNC_URL}/v1/cnc/generate",
             json=payload,
@@ -88,9 +106,31 @@ async def _process_job(client: httpx.AsyncClient, message: dict[str, Any]) -> di
             "request_id": request_id,
             "detail": "Local CNC AI is unavailable",
         }
+    finally:
+        if lease is not None:
+            try:
+                restored = await asyncio.to_thread(MINING_ARBITRATOR.release, lease)
+                if not restored and lease.restore_required:
+                    logger.warning(
+                        "mining_not_restored_immediately request_id=%s",
+                        request_id,
+                    )
+            except Exception as exc:
+                logger.error(
+                    "mining_arbitration_release_failed request_id=%s error=%s",
+                    request_id,
+                    type(exc).__name__,
+                )
 
 
 async def run_forever() -> None:
+    try:
+        recovered = await asyncio.to_thread(MINING_ARBITRATOR.recover_expired)
+        if not recovered:
+            logger.warning("startup_mining_recovery_deferred")
+    except Exception as exc:
+        logger.error("startup_mining_recovery_failed error=%s", type(exc).__name__)
+
     if not GATEWAY_WS_URL.startswith(("ws://", "wss://")):
         raise RuntimeError("CNC_GATEWAY_WS_URL must be configured")
     if len(WORKER_TOKEN) < 24:
