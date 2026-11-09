@@ -76,11 +76,13 @@ AI-код считается только черновиком. Приложен
 
 ## AI backend
 
-Backend теперь использует provider layer: Android работает с единым CNC API, а конкретная нейросеть выбирается сервером через `CNC_AI_PROVIDER`. Текущий provider — OpenAI Responses API; Local AI будет подключён на M3.2 без изменения Android-контракта.
+Backend использует provider layer: Android работает с единым CNC API, а конкретная нейросеть выбирается сервером через `CNC_AI_PROVIDER`. Доступны OpenAI Responses и локальный Ollama provider; Android-контракт при переключении не меняется.
 
 Основные переменные:
 
-- `CNC_AI_PROVIDER` — активный provider (`openai` на M3.1);
+- `CNC_AI_PROVIDER` — активный provider (`openai` или `ollama`);
+- `OLLAMA_MODEL` — локальная модель, стартово `qwen2.5-coder:7b-instruct`;
+- `OLLAMA_KEEP_ALIVE=0s` — освобождать VRAM после ответа;
 - `OPENAI_API_KEY` — ключ OpenAI provider;
 - `OPENAI_MODEL` — выбранная модель;
 - `CNC_APP_TOKEN` — необязательный общий токен для временного ограничения доступа.

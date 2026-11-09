@@ -5,6 +5,7 @@ from typing import Any
 
 from .base import AiProvider, ProviderNotConfigured
 from .openai_provider import OpenAiResponsesProvider
+from .ollama_provider import OllamaProvider
 
 
 class UnavailableProvider:
@@ -41,5 +42,7 @@ def build_provider(requested_name: str | None = None) -> AiProvider:
     if name in {"openai", "openai-responses", "openai_responses"}:
         return OpenAiResponsesProvider.from_env()
 
-    # M3.2 will add the local GPU provider here without changing Android API.
+    if name in {"ollama", "local", "local-ollama", "local_ollama"}:
+        return OllamaProvider.from_env()
+
     return UnavailableProvider(name)

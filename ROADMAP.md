@@ -16,7 +16,7 @@
 ## M3 — Local AI / собственная GPU-инфраструктура
 
 ### M3.1 — AI Provider Layer
-Статус: **реализовано в ветке `roadmap/m3-1-provider-layer`, ожидает CI/merge**.
+Статус: **завершено и слито в `main`**.
 
 - [x] отделить CNC API от конкретного OpenAI provider;
 - [x] единый интерфейс provider;
@@ -27,10 +27,22 @@
 - [x] CI compileall для всех backend-модулей.
 
 ### M3.2 — локальная LLM
-- локальный inference server;
-- квантованная coding/instruct-модель;
-- тест на GPU 10 GB VRAM;
-- CNC-specific system prompt.
+Статус: **реализовано и проверено на RTX 3080 10 GB**.
+
+- [x] Ollama provider в backend;
+- [x] structured JSON output;
+- [x] стартовая модель `qwen2.5-coder:7b-instruct`;
+- [x] контекст 8192 для 10 GB VRAM;
+- [x] автоматическая выгрузка модели из VRAM после ответа;
+- [x] PowerShell-скрипт локального запуска;
+- [x] Ollama 0.40.15 установлен на рабочем ПК;
+- [x] модель 4.7 GB скачана;
+- [x] RTX 3080 обнаружена через CUDA;
+- [x] полный путь FastAPI → Ollama → RTX 3080 проверен;
+- [x] initial CNC safety benchmark: при недостаточных данных код не генерируется;
+- [x] VRAM после ответа освобождается автоматически.
+
+Baseline при активном майнинге: около 49.5 с на первый safety-запрос; VRAM ~1.36 → ~6.49 → ~1.36 GB. Производительность с автоматической паузой майнинга будет измерена на M3.5.
 
 ### M3.3 — AI Gateway
 - HTTPS;
