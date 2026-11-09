@@ -86,6 +86,9 @@ jobs:
       - name: Run gateway unit tests
         run: python3 -m unittest discover -s gateway/tests -p 'test_*.py'
 
+      - name: Run worker unit tests
+        run: python3 -m unittest discover -s worker/tests -p 'test_*.py'
+
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
 
