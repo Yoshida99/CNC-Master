@@ -42,15 +42,15 @@ def wait_for_worker(client: httpx.Client, timeout_seconds: float = 20.0) -> dict
 
 
 def main() -> int:
-    client_token = secrets.token_urlsafe(32)
     session_secret = secrets.token_urlsafe(48)
     worker_token = secrets.token_urlsafe(40)
+    installation_id = "7f4c7834-5727-4ca8-9c53-5b769fa18e8e"
 
     gateway_env = os.environ.copy()
     gateway_env.update({
-        "CNC_CLIENT_TOKENS_JSON": json.dumps({"e2e": client_token}),
         "CNC_SESSION_SECRET": session_secret,
         "CNC_WORKER_TOKEN": worker_token,
+        "CNC_ALLOW_ANONYMOUS_CLIENTS": "true",
         "CNC_ALLOW_LEGACY_TOKEN": "false",
         "CNC_REQUEST_TIMEOUT_SECONDS": "240",
         "CNC_RATE_LIMIT": "10",
@@ -104,7 +104,7 @@ def main() -> int:
 
             auth = client.post(
                 f"{GATEWAY_URL}/v1/auth/session",
-                headers={"X-CNC-App-Token": client_token},
+                headers={"X-CNC-Install-Id": installation_id},
             )
             auth.raise_for_status()
             access_token = auth.json()["access_token"]
