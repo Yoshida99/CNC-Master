@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
@@ -227,7 +228,7 @@ async def worker_websocket(websocket: WebSocket) -> None:
     supplied_token = websocket.headers.get("x-cnc-worker-token", "")
     worker_id = websocket.headers.get("x-cnc-worker-id", "gpu-worker")
 
-    if not worker_token or supplied_token != worker_token:
+    if not worker_token or not hmac.compare_digest(supplied_token, worker_token):
         await websocket.close(code=1008, reason="worker authentication failed")
         return
 
