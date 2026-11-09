@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import time
+import re
 from dataclasses import dataclass
 
 
@@ -133,3 +134,14 @@ def parse_client_token_hashes(raw_json: str) -> dict[str, str]:
     if not isinstance(value, dict):
         raise SecurityConfigError("CNC_CLIENT_TOKEN_HASHES_JSON must be a JSON object")
     return {str(key): str(item) for key, item in value.items()}
+
+
+_INSTALL_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
+
+
+def anonymous_user_id(installation_id: str | None) -> str | None:
+    value = (installation_id or "").strip()
+    if not _INSTALL_ID_RE.fullmatch(value):
+        return None
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
+    return f"anon:{digest}"
