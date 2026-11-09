@@ -114,4 +114,57 @@ class AiCncCoreTest {
         assertNull(request.header(CNC_APP_TOKEN_HEADER))
     }
 
+
+    @Test
+    fun `gateway health reports connected GPU worker and queue`() {
+        val health = AiCncApi.parseHealth(
+            """{"ok":true,"worker_connected":true,"worker_id":"GPU-PC","queue_depth":1,"queue_max":8}"""
+        )
+
+        assertTrue(health.serverOnline)
+        assertTrue(health.aiOnline)
+        assertEquals(true, health.workerConnected)
+        assertEquals("GPU-PC", health.workerId)
+        assertEquals(1, health.queueDepth)
+        assertEquals(8, health.queueMax)
+    }
+
+    @Test
+    fun `gateway health reports AI offline when worker disconnected`() {
+        val health = AiCncApi.parseHealth(
+            """{"ok":true,"worker_connected":false,"queue_depth":0,"queue_max":8}"""
+        )
+
+        assertTrue(health.serverOnline)
+        assertFalse(health.aiOnline)
+        assertEquals(false, health.workerConnected)
+    }
+
+    @Test
+    fun `direct local backend health stays compatible`() {
+        val health = AiCncApi.parseHealth(
+            """{"ok":true,"provider":"ollama","model":"qwen2.5-coder:7b-instruct","ai_configured":true}"""
+        )
+
+        assertTrue(health.serverOnline)
+        assertTrue(health.aiOnline)
+        assertNull(health.workerConnected)
+        assertEquals("ollama", health.provider)
+        assertEquals("qwen2.5-coder:7b-instruct", health.model)
+    }
+
+    @Test
+    fun `gateway session request sends installation id without shared secret`() {
+        val request = AiCncApi.buildSessionRequest(
+            endpoint = "https://example.com/v1/auth/session",
+            installationId = "7f4c7834-5727-4ca8-9c53-5b769fa18e8e",
+        )
+
+        assertEquals(
+            "7f4c7834-5727-4ca8-9c53-5b769fa18e8e",
+            request.header("X-CNC-Install-Id"),
+        )
+        assertNull(request.header(CNC_APP_TOKEN_HEADER))
+    }
+
 }
