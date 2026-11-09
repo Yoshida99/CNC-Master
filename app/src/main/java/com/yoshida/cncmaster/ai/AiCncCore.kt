@@ -76,6 +76,7 @@ object AiCncApi {
     suspend fun generate(
         baseUrl: String,
         appToken: String = "",
+        installationId: String = "",
         request: AiCncRequest,
     ): AiCncResult = withContext(Dispatchers.IO) {
         require(baseUrl.isNotBlank()) { "AI backend ещё не настроен" }
@@ -94,12 +95,12 @@ object AiCncApi {
             .put("current_code", request.currentCode)
             .toString()
 
-        var auth = resolveAuth(normalizedBaseUrl, appToken)
+        var auth = resolveAuth(normalizedBaseUrl, appToken, installationId)
         var attempt = performGenerate(endpoint, payload, auth)
 
         if (attempt.code == 401 && auth.bearerToken.isNotBlank()) {
             invalidateSession()
-            auth = resolveAuth(normalizedBaseUrl, appToken, forceRefresh = true)
+            auth = resolveAuth(normalizedBaseUrl, appToken, installationId, forceRefresh = true)
             attempt = performGenerate(endpoint, payload, auth)
         }
 
@@ -122,10 +123,12 @@ object AiCncApi {
     private fun resolveAuth(
         baseUrl: String,
         appToken: String,
+        installationId: String,
         forceRefresh: Boolean = false,
     ): RequestAuth {
         val bootstrapToken = appToken.trim()
-        if (bootstrapToken.isEmpty()) {
+        val installId = installationId.trim()
+        if (bootstrapToken.isEmpty() && installId.isEmpty()) {
             return RequestAuth()
         }
 
@@ -135,14 +138,14 @@ object AiCncApi {
             if (!forceRefresh &&
                 cached != null &&
                 cached.baseUrl == baseUrl &&
-                cached.bootstrapToken == bootstrapToken &&
+                cached.bootstrapToken == "$bootstrapToken|$installId" &&
                 cached.expiresAtEpochSeconds > now + 30
             ) {
                 return RequestAuth(bearerToken = cached.accessToken)
             }
 
             val authEndpoint = baseUrl + "/v1/auth/session"
-            val request = buildSessionRequest(authEndpoint, bootstrapToken)
+            val request = buildSessionRequest(authEndpoint, bootstrapToken, installId)
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
 
@@ -171,7 +174,7 @@ object AiCncApi {
                 )
                 cachedSession = GatewaySession(
                     baseUrl = baseUrl,
-                    bootstrapToken = bootstrapToken,
+                    bootstrapToken = "$bootstrapToken|$installId",
                     accessToken = accessToken,
                     expiresAtEpochSeconds = expiresAt,
                 )
@@ -205,13 +208,24 @@ object AiCncApi {
         }
     }
 
-    internal fun buildSessionRequest(endpoint: String, appToken: String): Request =
-        Request.Builder()
+    internal fun buildSessionRequest(
+        endpoint: String,
+        appToken: String = "",
+        installationId: String = "",
+    ): Request {
+        val builder = Request.Builder()
             .url(endpoint)
             .post("{}".toRequestBody(jsonType))
             .header("Accept", "application/json")
-            .header(CNC_APP_TOKEN_HEADER, appToken.trim())
-            .build()
+
+        appToken.trim().takeIf { it.isNotEmpty() }?.let {
+            builder.header(CNC_APP_TOKEN_HEADER, it)
+        }
+        installationId.trim().takeIf { it.isNotEmpty() }?.let {
+            builder.header("X-CNC-Install-Id", it)
+        }
+        return builder.build()
+    }
 
     internal fun buildRequest(
         endpoint: String,
