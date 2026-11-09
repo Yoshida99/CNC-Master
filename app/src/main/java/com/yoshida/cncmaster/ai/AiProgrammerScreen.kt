@@ -159,8 +159,9 @@ fun AiProgrammerScreen(onBack: () -> Unit) {
                         scope.launch {
                             runCatching {
                                 AiCncApi.generate(
-                                    BuildConfig.AI_BACKEND_URL,
-                                    AiCncRequest(
+                                    baseUrl = BuildConfig.AI_BACKEND_URL,
+                                    appToken = BuildConfig.AI_APP_TOKEN,
+                                    request = AiCncRequest(
                                         message = task,
                                         machine = machine,
                                         control = control,
